@@ -1,0 +1,11 @@
+project_id = "iwfppxrekyqdsniibacw"
+
+[auth]
+enabled = true
+site_url = "http://localhost:3000"
+
+[functions.analyze-clothing]
+verify_jwt = false
+
+[functions.edit-clothing]
+verify_jwt = false
