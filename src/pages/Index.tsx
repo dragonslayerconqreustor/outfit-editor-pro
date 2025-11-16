@@ -88,10 +88,20 @@ const Index = () => {
       if (error) throw error;
 
       setEditedImage(data.editedImage);
-      toast({
-        title: "Editing complete",
-        description: "Your clothing has been changed successfully",
-      });
+      
+      // Show appropriate message based on whether sanitization occurred
+      if (data.sanitized) {
+        toast({
+          title: "Prompt sanitized",
+          description: `Removed unsafe terms (${data.removedTerms.join(', ')}). Generated with safer version.`,
+          variant: "default",
+        });
+      } else {
+        toast({
+          title: "Editing complete",
+          description: "Your clothing has been changed successfully",
+        });
+      }
     } catch (error) {
       console.error('Error editing clothing:', error);
       toast({

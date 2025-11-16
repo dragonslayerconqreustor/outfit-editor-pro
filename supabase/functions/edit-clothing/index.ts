@@ -20,10 +20,24 @@ serve(async (req) => {
 
     console.log('Editing clothing with prompt:', prompt);
 
-    // Sanitize unsafe terms to reduce model refusals and keep edits SFW
-    const safePrompt = String(prompt || '')
-      .replace(/\b(sex(y|iest)?|see[-\s]?through|transparent|sheer|lingerie)\b/gi, 'stylish')
-      .concat(' (ensure opaque fabric and appropriate coverage, no nudity)');
+    // Detect and sanitize unsafe terms
+    const unsafeTerms = /\b(sex(y|iest)?|see[-\s]?through|transparent|sheer|lingerie|nude|naked|explicit|revealing|provocative)\b/gi;
+    const foundTerms = String(prompt || '').match(unsafeTerms) || [];
+    
+    // Remove unsafe terms and clean up the prompt
+    let safePrompt = String(prompt || '')
+      .replace(unsafeTerms, '')
+      .replace(/\s+/g, ' ')  // Remove extra spaces
+      .trim();
+    
+    // Add safety suffix
+    safePrompt = safePrompt + ' (appropriate, opaque fabric with full coverage, no nudity or explicit content)';
+    
+    // Track if sanitization occurred
+    const wasSanitized = foundTerms.length > 0;
+    if (wasSanitized) {
+      console.log('Prompt sanitized. Removed terms:', foundTerms.join(', '));
+    }
 
     const instruction = `Edit the provided image by changing only the clothing to: ${safePrompt}.
 
@@ -110,7 +124,12 @@ Strict requirements:
     console.log('Successfully edited clothing');
 
     return new Response(
-      JSON.stringify({ editedImage: editedImageUrl }),
+      JSON.stringify({ 
+        editedImage: editedImageUrl,
+        sanitized: wasSanitized,
+        removedTerms: wasSanitized ? foundTerms : undefined,
+        cleanedPrompt: wasSanitized ? safePrompt : undefined
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
