@@ -20,6 +20,21 @@ serve(async (req) => {
 
     console.log('Editing clothing with prompt:', prompt);
 
+    // Sanitize unsafe terms to reduce model refusals and keep edits SFW
+    const safePrompt = String(prompt || '')
+      .replace(/\b(sex(y|iest)?|see[-\s]?through|transparent|sheer|lingerie)\b/gi, 'stylish')
+      .concat(' (ensure opaque fabric and appropriate coverage, no nudity)');
+
+    const instruction = `Edit the provided image by changing only the clothing to: ${safePrompt}.
+
+Strict requirements:
+- Preserve the person's exact identity (face, skin tone, hair), pose, body shape, and proportions
+- Preserve the background, objects, composition, camera angle, and lighting
+- Do not alter face, hair, skin, tattoos, accessories, hands, or environment
+- No nudity or sexually explicit content; use opaque fabrics and appropriate coverage
+- Photorealistic result consistent with the original image`; 
+
+    // True image-to-image editing: pass the original image with the instruction
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -27,28 +42,17 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
+        model: 'google/gemini-2.5-flash-image-preview',
         messages: [
           {
             role: 'user',
             content: [
-              {
-                type: 'text',
-                text: `You are an expert at image editing. Based on the provided image and the following instruction, generate a detailed description of what the edited image should look like, keeping everything the same except the clothing.
-
-Instruction: Change the clothing to: ${prompt}
-
-Provide a detailed prompt that can be used to generate a new image with the changed clothing, maintaining all other aspects like the person's appearance, pose, background, lighting, and composition.`
-              },
-              {
-                type: 'image_url',
-                image_url: {
-                  url: image
-                }
-              }
+              { type: 'text', text: instruction },
+              { type: 'image_url', image_url: { url: image } }
             ]
           }
-        ]
+        ],
+        modalities: ['image', 'text']
       })
     });
 
@@ -66,69 +70,40 @@ Provide a detailed prompt that can be used to generate a new image with the chan
         );
       }
       const errorText = await response.text();
-      console.error('AI gateway error (analysis):', response.status, errorText);
-      throw new Error('Failed to analyze image for editing');
+      console.error('AI gateway error (image-edit):', response.status, errorText);
+      throw new Error('Failed to edit image');
     }
 
-    const analysisData = await response.json();
-    const editPrompt = analysisData.choices?.[0]?.message?.content || '';
-    console.log('Generated edit prompt:', editPrompt);
+    const data = await response.json();
+    console.log('AI Image Edit Response:', JSON.stringify(data, null, 2));
 
-    // Now generate the new image using the edit prompt
-    const imageGenResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash-image',
-        messages: [
-          {
-            role: 'user',
-            content: editPrompt
-          }
-        ],
-        modalities: ['image', 'text']
-      })
-    });
+    const message = data.choices?.[0]?.message;
 
-    if (!imageGenResponse.ok) {
-      if (imageGenResponse.status === 429) {
-        return new Response(
-          JSON.stringify({ error: 'Rate limit exceeded. Please try again later.' }),
-          { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-      if (imageGenResponse.status === 402) {
-        return new Response(
-          JSON.stringify({ error: 'Payment required. Please add credits to your Lovable AI workspace.' }),
-          { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-      const errorText = await imageGenResponse.text();
-      console.error('AI gateway error (generation):', imageGenResponse.status, errorText);
-      throw new Error('Failed to generate edited clothing image');
+    // Refusal handling
+    const refusal = message?.refusal || (typeof message?.content === 'string' && /cannot\s+fulfill|refus/i.test(message.content));
+    if (refusal) {
+      return new Response(
+        JSON.stringify({
+          error: 'The requested edit was refused by the AI due to content safety. Try a safer description (e.g., "tiger-print swimsuit" or "casual denim jacket").'
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
-    const data = await imageGenResponse.json();
-    console.log('AI Image Generation Response:', JSON.stringify(data, null, 2));
-    
-    // Check multiple possible response formats
-    let editedImageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-    
-    // Alternative format: images might be directly in the message
-    if (!editedImageUrl && data.choices?.[0]?.message?.images?.[0]) {
-      editedImageUrl = data.choices[0].message.images[0];
+    // Attempt multiple extraction strategies
+    let editedImageUrl: string | undefined = message?.images?.[0]?.image_url?.url;
+
+    if (!editedImageUrl && Array.isArray(message?.images) && typeof message.images[0] === 'string') {
+      editedImageUrl = message.images[0] as string;
     }
-    
-    // Another alternative: content might contain the image
-    if (!editedImageUrl && data.choices?.[0]?.message?.content) {
-      console.log('Message content:', data.choices[0].message.content);
+
+    if (!editedImageUrl && typeof message?.content === 'string') {
+      const match = message.content.match(/data:image\/[a-zA-Z+]+;base64,[A-Za-z0-9+/=]+/);
+      if (match) editedImageUrl = match[0];
     }
 
     if (!editedImageUrl) {
-      console.error('Full response structure:', JSON.stringify(data, null, 2));
+      console.error('Full response structure (no image found):', JSON.stringify(data, null, 2));
       throw new Error('No edited image returned from AI. Check logs for response structure.');
     }
 
