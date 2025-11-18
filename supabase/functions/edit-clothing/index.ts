@@ -91,14 +91,31 @@ Strict requirements:
     const data = await response.json();
     console.log('AI Image Edit Response:', JSON.stringify(data, null, 2));
 
-    const message = data.choices?.[0]?.message;
+    const choice = data.choices?.[0];
+    const message = choice?.message;
 
-    // Refusal handling
-    const refusal = message?.refusal || (typeof message?.content === 'string' && /cannot\s+fulfill|refus/i.test(message.content));
+    // Handle content filter / prohibited content cases explicitly
+    const finishReason = choice?.finish_reason;
+    const nativeFinishReason = choice?.native_finish_reason;
+
+    if (finishReason === 'content_filter' || nativeFinishReason === 'PROHIBITED_CONTENT') {
+      return new Response(
+        JSON.stringify({
+          error:
+            'The requested edit was blocked by the AI safety filters. Try a more neutral, non-sexual clothing description (e.g., "black floral bikini" or "casual denim jacket").',
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Refusal handling (other safety / policy refusals)
+    const refusal = message?.refusal ||
+      (typeof message?.content === 'string' && /cannot\s+fulfill|refus/i.test(message.content));
     if (refusal) {
       return new Response(
         JSON.stringify({
-          error: 'The requested edit was refused by the AI due to content safety. Try a safer description (e.g., "tiger-print swimsuit" or "casual denim jacket").'
+          error:
+            'The requested edit was refused by the AI due to content safety. Try a safer description (e.g., "tiger-print swimsuit" or "casual denim jacket").',
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
