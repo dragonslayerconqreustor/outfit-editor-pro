@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Download, Maximize2, Trash2 } from "lucide-react";
+import { Download, Maximize2, Trash2, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
   AlertDialog,
@@ -33,9 +33,10 @@ export const ImageGallery = ({ onSelectImage, onViewFullscreen }: ImageGalleryPr
   const [images, setImages] = useState<SavedImage[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
   const { toast } = useToast();
 
-  const loadImages = async () => {
+  const loadImages = async (showToast = false) => {
     setLoading(true);
     const { data, error } = await supabase
       .from("user_images")
@@ -50,6 +51,12 @@ export const ImageGallery = ({ onSelectImage, onViewFullscreen }: ImageGalleryPr
       });
     } else {
       setImages(data || []);
+      if (showToast) {
+        toast({
+          title: "Gallery refreshed",
+          description: `${data?.length || 0} images loaded`,
+        });
+      }
     }
     setLoading(false);
   };
@@ -57,6 +64,12 @@ export const ImageGallery = ({ onSelectImage, onViewFullscreen }: ImageGalleryPr
   useEffect(() => {
     loadImages();
   }, []);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await loadImages(true);
+    setRefreshing(false);
+  };
 
   const handleDelete = async (id: string, storagePath: string) => {
     const { error: storageError } = await supabase.storage
@@ -116,22 +129,45 @@ export const ImageGallery = ({ onSelectImage, onViewFullscreen }: ImageGalleryPr
 
   if (loading) {
     return (
-      <div className="text-center py-8">
-        <p className="text-muted-foreground">Loading your gallery...</p>
+      <div className="text-center py-12">
+        <div className="flex flex-col items-center gap-4">
+          <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+          <p className="text-muted-foreground">Loading your gallery...</p>
+        </div>
       </div>
     );
   }
 
   if (images.length === 0) {
     return (
-      <div className="text-center py-8">
-        <p className="text-muted-foreground">No saved images yet. Upload and edit images to build your gallery!</p>
+      <div className="text-center py-12">
+        <Card className="p-8 max-w-md mx-auto">
+          <div className="space-y-4">
+            <div className="text-6xl">📸</div>
+            <h3 className="text-xl font-semibold">No images yet</h3>
+            <p className="text-muted-foreground">
+              Upload and edit images to build your gallery!
+            </p>
+          </div>
+        </Card>
       </div>
     );
   }
 
   return (
     <>
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-2xl font-semibold">{images.length} {images.length === 1 ? 'Image' : 'Images'}</h2>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleRefresh}
+          disabled={refreshing}
+        >
+          <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
+      </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {images.map((image) => (
           <Card key={image.id} className="overflow-hidden group">
