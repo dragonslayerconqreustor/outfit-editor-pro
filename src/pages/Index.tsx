@@ -1,20 +1,44 @@
-import { useState } from "react";
-import { Upload, Sparkles, Download, Loader2 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Upload, Sparkles, Download, Loader2, LogOut, Save, Image as ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { Auth } from "@/components/Auth";
+import { ImageGallery } from "@/components/ImageGallery";
+import { FullscreenImageModal } from "@/components/FullscreenImageModal";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const Index = () => {
+  const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>("");
   const [editedImage, setEditedImage] = useState<string>("");
   const [clothingPrompt, setClothingPrompt] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [detectedClothing, setDetectedClothing] = useState<string[]>([]);
+  const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
+  const [currentTab, setCurrentTab] = useState("editor");
   const { toast } = useToast();
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      setLoading(false);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -114,6 +138,53 @@ const Index = () => {
     }
   };
 
+  const saveImage = async () => {
+    if (!selectedImage || !user) return;
+
+    setIsSaving(true);
+    try {
+      // Upload original image to storage
+      const fileExt = selectedImage.name.split('.').pop();
+      const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+      const { error: uploadError } = await supabase.storage
+        .from("fashion-images")
+        .upload(fileName, selectedImage);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from("fashion-images")
+        .getPublicUrl(fileName);
+
+      // Save to database
+      const { error: dbError } = await supabase.from("user_images").insert({
+        user_id: user.id,
+        original_url: publicUrl,
+        edited_url: editedImage || null,
+        filename: selectedImage.name,
+        storage_path: fileName,
+      });
+
+      if (dbError) throw dbError;
+
+      toast({
+        title: "Image saved",
+        description: "Image has been saved to your gallery.",
+      });
+      
+      setCurrentTab("gallery");
+    } catch (error: any) {
+      console.error("Error saving image:", error);
+      toast({
+        variant: "destructive",
+        title: "Error saving",
+        description: error.message || "Failed to save image.",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const downloadImage = () => {
     if (!editedImage) return;
 
@@ -125,173 +196,219 @@ const Index = () => {
     document.body.removeChild(link);
   };
 
-  return (
-    <div className="min-h-screen bg-background overflow-hidden relative">
-      {/* Animated background gradient */}
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-background to-secondary/10 animate-pulse" style={{ animationDuration: '8s' }} />
-      
-      <div className="relative z-10 container mx-auto px-4 py-12">
-        {/* Header */}
-        <div className="text-center mb-12 space-y-4">
-          <h1 className="text-5xl md:text-7xl font-bold bg-gradient-primary bg-clip-text text-transparent animate-in fade-in slide-in-from-bottom-4 duration-1000">
-            AI Fashion Editor
-          </h1>
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto animate-in fade-in slide-in-from-bottom-5 duration-1000 delay-150">
-            Transform any outfit with the power of AI. Upload an image, describe your vision, and watch the magic happen.
-          </p>
-        </div>
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+  };
 
-        <div className="grid lg:grid-cols-2 gap-8 max-w-7xl mx-auto">
-          {/* Left Column - Upload & Controls */}
-          <div className="space-y-6 animate-in fade-in slide-in-from-left duration-700">
-            <Card className="p-8 bg-card/50 backdrop-blur-sm border-border shadow-card hover:shadow-glow transition-all duration-300">
-              <h2 className="text-2xl font-semibold mb-6 flex items-center gap-2">
-                <Upload className="w-6 h-6 text-primary" />
-                Upload Image
-              </h2>
-              
-              <div className="space-y-6">
-                <div className="border-2 border-dashed border-border rounded-lg p-8 text-center hover:border-primary transition-all duration-300 cursor-pointer bg-muted/30"
-                     onClick={() => document.getElementById('image-upload')?.click()}>
-                  {imagePreview ? (
-                    <img src={imagePreview} alt="Preview" className="max-h-64 mx-auto rounded-lg shadow-lg" />
-                  ) : (
-                    <div className="py-12">
-                      <Upload className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
-                      <p className="text-muted-foreground">Click to upload or drag and drop</p>
-                      <p className="text-sm text-muted-foreground mt-2">PNG, JPG, WEBP up to 10MB</p>
-                    </div>
-                  )}
+  const handleSelectFromGallery = (imageUrl: string) => {
+    setImagePreview(imageUrl);
+    setEditedImage("");
+    setDetectedClothing([]);
+    setCurrentTab("editor");
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Auth />;
+  }
+
+  return (
+    <>
+      <div className="min-h-screen bg-gradient-to-br from-background via-secondary/20 to-background p-4 md:p-8">
+        <div className="max-w-7xl mx-auto space-y-8">
+          {/* Header */}
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+                AI Fashion Editor
+              </h1>
+              <p className="text-muted-foreground mt-2">
+                Upload photos, edit clothing with AI
+              </p>
+            </div>
+            <Button variant="outline" onClick={handleSignOut}>
+              <LogOut className="h-4 w-4 mr-2" />
+              Sign Out
+            </Button>
+          </div>
+
+          <Tabs value={currentTab} onValueChange={setCurrentTab}>
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="editor">
+                <Sparkles className="h-4 w-4 mr-2" />
+                Editor
+              </TabsTrigger>
+              <TabsTrigger value="gallery">
+                <ImageIcon className="h-4 w-4 mr-2" />
+                Gallery
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="editor" className="space-y-8">
+              {/* Upload Section */}
+              <Card className="p-8 border-dashed">
+                <div className="flex flex-col items-center justify-center space-y-4">
+                  <Upload className="h-12 w-12 text-muted-foreground" />
+                  <div className="text-center">
+                    <h2 className="text-2xl font-semibold">Upload an Image</h2>
+                    <p className="text-muted-foreground mt-2">
+                      Choose a photo with clothing to edit
+                    </p>
+                  </div>
                   <input
-                    id="image-upload"
                     type="file"
                     accept="image/*"
                     onChange={handleImageUpload}
                     className="hidden"
+                    id="image-upload"
                   />
+                  <Button asChild size="lg">
+                    <label htmlFor="image-upload" className="cursor-pointer">
+                      Select Image
+                    </label>
+                  </Button>
                 </div>
+              </Card>
 
-                {imagePreview && (
-                  <>
-                    <Button 
-                      onClick={analyzeClothing} 
-                      disabled={isAnalyzing}
-                      className="w-full bg-gradient-primary hover:opacity-90 transition-opacity"
-                      size="lg"
-                    >
-                      {isAnalyzing ? (
-                        <>
-                          <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                          Analyzing...
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles className="w-5 h-5 mr-2" />
-                          Analyze Clothing
-                        </>
+              {/* Image Preview & Analysis */}
+              {imagePreview && (
+                <div className="grid md:grid-cols-2 gap-8">
+                  <Card className="p-6 space-y-4">
+                    <h3 className="text-xl font-semibold">Original Image</h3>
+                    <img
+                      src={imagePreview}
+                      alt="Original"
+                      className="w-full rounded-lg cursor-pointer"
+                      onClick={() => setFullscreenImage(imagePreview)}
+                    />
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={analyzeClothing}
+                        disabled={isAnalyzing}
+                        className="flex-1"
+                      >
+                        {isAnalyzing ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Analyzing...
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="mr-2 h-4 w-4" />
+                            Analyze Clothing
+                          </>
+                        )}
+                      </Button>
+                      {selectedImage && (
+                        <Button
+                          onClick={saveImage}
+                          disabled={isSaving || !user}
+                          variant="secondary"
+                        >
+                          {isSaving ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Saving...
+                            </>
+                          ) : (
+                            <>
+                              <Save className="mr-2 h-4 w-4" />
+                              Save
+                            </>
+                          )}
+                        </Button>
                       )}
-                    </Button>
+                    </div>
 
                     {detectedClothing.length > 0 && (
-                      <div className="space-y-3 p-4 bg-muted/50 rounded-lg">
-                        <h3 className="font-semibold text-sm text-foreground">Detected Items:</h3>
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium">Detected Items:</p>
                         <div className="flex flex-wrap gap-2">
-                          {detectedClothing.map((item, idx) => (
-                            <span key={idx} className="px-3 py-1 bg-primary/20 text-primary rounded-full text-sm border border-primary/30">
+                          {detectedClothing.map((item, index) => (
+                            <span
+                              key={index}
+                              className="px-3 py-1 bg-primary/10 text-primary rounded-full text-sm"
+                            >
                               {item}
                             </span>
                           ))}
                         </div>
                       </div>
                     )}
+                  </Card>
 
-                    <div className="space-y-3">
-                      <label className="text-sm font-medium text-foreground">
-                        Describe the new clothing
-                      </label>
-                      <Textarea
-                        placeholder="e.g., a professional business suit with a blue tie, an elegant red evening gown, casual jeans and a white t-shirt..."
-                        value={clothingPrompt}
-                        onChange={(e) => setClothingPrompt(e.target.value)}
-                        className="min-h-32 bg-muted/30 border-border focus:border-primary transition-colors"
+                  {editedImage && (
+                    <Card className="p-6 space-y-4">
+                      <h3 className="text-xl font-semibold">Edited Image</h3>
+                      <img
+                        src={editedImage}
+                        alt="Edited"
+                        className="w-full rounded-lg cursor-pointer"
+                        onClick={() => setFullscreenImage(editedImage)}
                       />
-                    </div>
-
-                    <Button 
-                      onClick={editClothing} 
-                      disabled={isEditing || !clothingPrompt.trim()}
-                      className="w-full bg-gradient-secondary hover:opacity-90 transition-opacity"
-                      size="lg"
-                    >
-                      {isEditing ? (
-                        <>
-                          <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                          Editing...
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles className="w-5 h-5 mr-2" />
-                          Transform Clothing
-                        </>
-                      )}
-                    </Button>
-                  </>
-                )}
-              </div>
-            </Card>
-          </div>
-
-          {/* Right Column - Result */}
-          <div className="space-y-6 animate-in fade-in slide-in-from-right duration-700">
-            <Card className="p-8 bg-card/50 backdrop-blur-sm border-border shadow-card hover:shadow-glow transition-all duration-300 min-h-[500px] flex flex-col">
-              <h2 className="text-2xl font-semibold mb-6 flex items-center gap-2">
-                <Sparkles className="w-6 h-6 text-secondary" />
-                Result
-              </h2>
-              
-              {editedImage ? (
-                <div className="flex-1 flex flex-col items-center justify-center space-y-6">
-                  <div className="relative group">
-                    <img 
-                      src={editedImage} 
-                      alt="Edited result" 
-                      className="max-h-96 rounded-lg shadow-2xl transition-transform duration-300 group-hover:scale-[1.02]" 
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-primary/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-lg" />
-                  </div>
-                  <Button 
-                    onClick={downloadImage}
-                    className="bg-accent hover:bg-accent/90 transition-colors"
-                    size="lg"
-                  >
-                    <Download className="w-5 h-5 mr-2" />
-                    Download Image
-                  </Button>
-                </div>
-              ) : (
-                <div className="flex-1 flex items-center justify-center">
-                  <div className="text-center space-y-3">
-                    <div className="w-32 h-32 mx-auto bg-gradient-accent rounded-full flex items-center justify-center opacity-20">
-                      <Sparkles className="w-16 h-16" />
-                    </div>
-                    <p className="text-muted-foreground">
-                      {isEditing ? "AI is working its magic..." : "Upload an image and describe your vision to see the result here"}
-                    </p>
-                  </div>
+                      <Button onClick={downloadImage} className="w-full">
+                        <Download className="mr-2 h-4 w-4" />
+                        Download
+                      </Button>
+                    </Card>
+                  )}
                 </div>
               )}
-            </Card>
-          </div>
-        </div>
 
-        {/* Footer info */}
-        <div className="mt-12 text-center">
-          <p className="text-sm text-muted-foreground">
-            Powered by advanced AI image editing technology
-          </p>
+              {/* Edit Section */}
+              {imagePreview && (
+                <Card className="p-6 space-y-4">
+                  <h3 className="text-xl font-semibold">Edit Clothing</h3>
+                  <Textarea
+                    placeholder="Describe the new clothing (e.g., 'red summer dress', 'blue denim jacket')..."
+                    value={clothingPrompt}
+                    onChange={(e) => setClothingPrompt(e.target.value)}
+                    className="min-h-[100px]"
+                  />
+                  <Button
+                    onClick={editClothing}
+                    disabled={isEditing || !clothingPrompt.trim()}
+                    className="w-full"
+                    size="lg"
+                  >
+                    {isEditing ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Editing Clothing...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="mr-2 h-4 w-4" />
+                        Edit Clothing
+                      </>
+                    )}
+                  </Button>
+                </Card>
+              )}
+            </TabsContent>
+
+            <TabsContent value="gallery" className="space-y-4">
+              <ImageGallery
+                onSelectImage={handleSelectFromGallery}
+                onViewFullscreen={setFullscreenImage}
+              />
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
-    </div>
+
+      <FullscreenImageModal
+        imageUrl={fullscreenImage}
+        onClose={() => setFullscreenImage(null)}
+      />
+    </>
   );
 };
 
