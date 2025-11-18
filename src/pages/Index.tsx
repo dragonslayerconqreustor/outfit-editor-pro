@@ -8,6 +8,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Auth } from "@/components/Auth";
 import { ImageGallery } from "@/components/ImageGallery";
 import { FullscreenImageModal } from "@/components/FullscreenImageModal";
+import { ExamplePrompts } from "@/components/ExamplePrompts";
+import { UploadTips } from "@/components/UploadTips";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const Index = () => {
@@ -46,11 +48,21 @@ const Index = () => {
       if (!file.type.startsWith('image/')) {
         toast({
           title: "Invalid file",
-          description: "Please upload an image file",
+          description: "Please upload an image file (JPEG, PNG, etc.)",
           variant: "destructive",
         });
         return;
       }
+      
+      if (file.size > 10 * 1024 * 1024) { // 10MB limit
+        toast({
+          title: "File too large",
+          description: "Please upload an image smaller than 10MB",
+          variant: "destructive",
+        });
+        return;
+      }
+      
       setSelectedImage(file);
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -59,6 +71,7 @@ const Index = () => {
       reader.readAsDataURL(file);
       setEditedImage("");
       setDetectedClothing([]);
+      setClothingPrompt("");
     }
   };
 
@@ -109,28 +122,53 @@ const Index = () => {
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase function error:', error);
+        throw error;
+      }
+
+      if (data?.error) {
+        // Handle explicit error responses from the edge function
+        toast({
+          title: "Unable to edit",
+          description: data.error,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (!data?.editedImage) {
+        throw new Error('No edited image returned from the server');
+      }
 
       setEditedImage(data.editedImage);
       
       // Show appropriate message based on whether sanitization occurred
       if (data.sanitized) {
         toast({
-          title: "Prompt sanitized",
-          description: `Removed unsafe terms (${data.removedTerms.join(', ')}). Generated with safer version.`,
-          variant: "default",
+          title: "Prompt adjusted",
+          description: `Made adjustments for safety. Generated successfully!`,
         });
       } else {
         toast({
-          title: "Editing complete",
+          title: "Success!",
           description: "Your clothing has been changed successfully",
         });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error editing clothing:', error);
+      
+      let errorMessage = "Failed to edit clothing. Please try a different description.";
+      
+      if (error.message?.includes('content_filter') || error.message?.includes('safety')) {
+        errorMessage = "The AI safety filters blocked this request. Try a more neutral clothing description.";
+      } else if (error.message?.includes('network') || error.message?.includes('fetch')) {
+        errorMessage = "Network error. Please check your connection and try again.";
+      }
+      
       toast({
         title: "Editing failed",
-        description: "Failed to edit clothing. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -139,16 +177,44 @@ const Index = () => {
   };
 
   const saveImage = async () => {
-    if (!selectedImage || !user) return;
+    if (!user) {
+      toast({
+        title: "Authentication required",
+        description: "Please sign in to save images",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!imagePreview) {
+      toast({
+        title: "No image",
+        description: "Please upload an image first",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setIsSaving(true);
     try {
-      // Upload original image to storage
-      const fileExt = selectedImage.name.split('.').pop();
+      // Convert base64 or blob URL to file
+      let fileToUpload: File;
+      
+      if (selectedImage) {
+        fileToUpload = selectedImage;
+      } else {
+        // If we're saving from gallery (imagePreview is a URL)
+        const response = await fetch(imagePreview);
+        const blob = await response.blob();
+        fileToUpload = new File([blob], `image-${Date.now()}.png`, { type: 'image/png' });
+      }
+
+      const fileExt = fileToUpload.name.split('.').pop() || 'png';
       const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+      
       const { error: uploadError } = await supabase.storage
         .from("fashion-images")
-        .upload(fileName, selectedImage);
+        .upload(fileName, fileToUpload);
 
       if (uploadError) throw uploadError;
 
@@ -156,20 +222,40 @@ const Index = () => {
         .from("fashion-images")
         .getPublicUrl(fileName);
 
+      // Save edited image if it exists
+      let editedPublicUrl = null;
+      if (editedImage) {
+        const editedResponse = await fetch(editedImage);
+        const editedBlob = await editedResponse.blob();
+        const editedFile = new File([editedBlob], `edited-${Date.now()}.png`, { type: 'image/png' });
+        const editedFileName = `${user.id}/edited-${Date.now()}.png`;
+        
+        const { error: editedUploadError } = await supabase.storage
+          .from("fashion-images")
+          .upload(editedFileName, editedFile);
+
+        if (!editedUploadError) {
+          const { data: { publicUrl: editedUrl } } = supabase.storage
+            .from("fashion-images")
+            .getPublicUrl(editedFileName);
+          editedPublicUrl = editedUrl;
+        }
+      }
+
       // Save to database
       const { error: dbError } = await supabase.from("user_images").insert({
         user_id: user.id,
         original_url: publicUrl,
-        edited_url: editedImage || null,
-        filename: selectedImage.name,
+        edited_url: editedPublicUrl,
+        filename: fileToUpload.name,
         storage_path: fileName,
       });
 
       if (dbError) throw dbError;
 
       toast({
-        title: "Image saved",
-        description: "Image has been saved to your gallery.",
+        title: "Saved successfully!",
+        description: "Image has been added to your gallery.",
       });
       
       setCurrentTab("gallery");
@@ -178,7 +264,7 @@ const Index = () => {
       toast({
         variant: "destructive",
         title: "Error saving",
-        description: error.message || "Failed to save image.",
+        description: error.message || "Failed to save image. Please try again.",
       });
     } finally {
       setIsSaving(false);
@@ -252,6 +338,8 @@ const Index = () => {
             </TabsList>
 
             <TabsContent value="editor" className="space-y-8">
+              <UploadTips />
+              
               {/* Upload Section */}
               <Card className="p-8 border-dashed">
                 <div className="flex flex-col items-center justify-center space-y-4">
@@ -364,33 +452,37 @@ const Index = () => {
 
               {/* Edit Section */}
               {imagePreview && (
-                <Card className="p-6 space-y-4">
-                  <h3 className="text-xl font-semibold">Edit Clothing</h3>
-                  <Textarea
-                    placeholder="Describe the new clothing (e.g., 'red summer dress', 'blue denim jacket')..."
-                    value={clothingPrompt}
-                    onChange={(e) => setClothingPrompt(e.target.value)}
-                    className="min-h-[100px]"
-                  />
-                  <Button
-                    onClick={editClothing}
-                    disabled={isEditing || !clothingPrompt.trim()}
-                    className="w-full"
-                    size="lg"
-                  >
-                    {isEditing ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Editing Clothing...
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="mr-2 h-4 w-4" />
-                        Edit Clothing
-                      </>
-                    )}
-                  </Button>
-                </Card>
+                <>
+                  <Card className="p-6 space-y-4">
+                    <h3 className="text-xl font-semibold">Edit Clothing</h3>
+                    <Textarea
+                      placeholder="Describe the new clothing (e.g., 'red summer dress', 'blue denim jacket')..."
+                      value={clothingPrompt}
+                      onChange={(e) => setClothingPrompt(e.target.value)}
+                      className="min-h-[100px]"
+                    />
+                    <Button
+                      onClick={editClothing}
+                      disabled={isEditing || !clothingPrompt.trim()}
+                      className="w-full"
+                      size="lg"
+                    >
+                      {isEditing ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Editing Clothing...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="mr-2 h-4 w-4" />
+                          Edit Clothing
+                        </>
+                      )}
+                    </Button>
+                  </Card>
+
+                  <ExamplePrompts onSelectPrompt={setClothingPrompt} />
+                </>
               )}
             </TabsContent>
 
