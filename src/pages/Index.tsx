@@ -14,8 +14,6 @@ import { BeforeAfterSlider } from "@/components/BeforeAfterSlider";
 import { KeyboardShortcuts } from "@/components/KeyboardShortcuts";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useNavigate } from "react-router-dom";
-import { VirtualTryOn } from "@/components/VirtualTryOn";
-import { AIOutfitSuggestions } from "@/components/AIOutfitSuggestions";
 
 const Index = () => {
   const navigate = useNavigate();
@@ -371,7 +369,7 @@ const Index = () => {
           </div>
 
           <Tabs value={currentTab} onValueChange={setCurrentTab}>
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="editor">
                 <Sparkles className="h-4 w-4 mr-2" />
                 Editor
@@ -379,14 +377,6 @@ const Index = () => {
               <TabsTrigger value="gallery">
                 <ImageIcon className="h-4 w-4 mr-2" />
                 Gallery
-              </TabsTrigger>
-              <TabsTrigger value="tryon">
-                <Upload className="h-4 w-4 mr-2" />
-                Try-On
-              </TabsTrigger>
-              <TabsTrigger value="suggestions">
-                <Sparkles className="h-4 w-4 mr-2" />
-                AI Suggestions
               </TabsTrigger>
             </TabsList>
 
@@ -551,14 +541,6 @@ const Index = () => {
                 onSelectImage={handleSelectFromGallery}
                 onViewFullscreen={setFullscreenImage}
               />
-            </TabsContent>
-
-            <TabsContent value="tryon" className="space-y-4">
-              <VirtualTryOn />
-            </TabsContent>
-
-            <TabsContent value="suggestions" className="space-y-4">
-              <AIOutfitSuggestions />
             </TabsContent>
           </Tabs>
         </div>
