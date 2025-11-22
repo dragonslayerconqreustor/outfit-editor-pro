@@ -16,31 +16,40 @@ export type Database = {
     Tables: {
       user_images: {
         Row: {
+          description: string | null
           edited_url: string | null
           filename: string
           id: string
+          is_favorite: boolean | null
           original_url: string
           storage_path: string
+          tags: string[] | null
           updated_at: string | null
           uploaded_at: string | null
           user_id: string | null
         }
         Insert: {
+          description?: string | null
           edited_url?: string | null
           filename: string
           id?: string
+          is_favorite?: boolean | null
           original_url: string
           storage_path: string
+          tags?: string[] | null
           updated_at?: string | null
           uploaded_at?: string | null
           user_id?: string | null
         }
         Update: {
+          description?: string | null
           edited_url?: string | null
           filename?: string
           id?: string
+          is_favorite?: boolean | null
           original_url?: string
           storage_path?: string
+          tags?: string[] | null
           updated_at?: string | null
           uploaded_at?: string | null
           user_id?: string | null

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Upload, Sparkles, Download, Loader2, LogOut, Save, Image as ImageIcon } from "lucide-react";
+import { Upload, Sparkles, Download, Loader2, LogOut, Save, Image as ImageIcon, Settings as SettingsIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -10,9 +10,13 @@ import { ImageGallery } from "@/components/ImageGallery";
 import { FullscreenImageModal } from "@/components/FullscreenImageModal";
 import { ExamplePrompts } from "@/components/ExamplePrompts";
 import { UploadTips } from "@/components/UploadTips";
+import { BeforeAfterSlider } from "@/components/BeforeAfterSlider";
+import { KeyboardShortcuts } from "@/components/KeyboardShortcuts";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useNavigate } from "react-router-dom";
 
 const Index = () => {
+  const navigate = useNavigate();
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
@@ -41,6 +45,39 @@ const Index = () => {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      // Save image
+      if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+        e.preventDefault();
+        if (imagePreview && user) {
+          saveImage();
+        }
+      }
+      // Upload image
+      if ((e.ctrlKey || e.metaKey) && e.key === "u") {
+        e.preventDefault();
+        document.getElementById("image-upload")?.click();
+      }
+      // Tab switch
+      if (e.key === "Tab" && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+        const activeElement = document.activeElement;
+        if (activeElement?.tagName !== "INPUT" && activeElement?.tagName !== "TEXTAREA") {
+          e.preventDefault();
+          setCurrentTab((prev) => (prev === "editor" ? "gallery" : "editor"));
+        }
+      }
+      // Close fullscreen
+      if (e.key === "Escape") {
+        setFullscreenImage(null);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyPress);
+    return () => window.removeEventListener("keydown", handleKeyPress);
+  }, [imagePreview, user]);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -319,10 +356,16 @@ const Index = () => {
                 Upload photos, edit clothing with AI
               </p>
             </div>
-            <Button variant="outline" onClick={handleSignOut}>
-              <LogOut className="h-4 w-4 mr-2" />
-              Sign Out
-            </Button>
+            <div className="flex gap-2">
+              <KeyboardShortcuts />
+              <Button variant="outline" size="icon" onClick={() => navigate("/settings")}>
+                <SettingsIcon className="h-4 w-4" />
+              </Button>
+              <Button variant="outline" onClick={handleSignOut}>
+                <LogOut className="h-4 w-4 mr-2" />
+                Sign Out
+              </Button>
+            </div>
           </div>
 
           <Tabs value={currentTab} onValueChange={setCurrentTab}>
@@ -433,19 +476,26 @@ const Index = () => {
                   </Card>
 
                   {editedImage && (
-                    <Card className="p-6 space-y-4">
-                      <h3 className="text-xl font-semibold">Edited Image</h3>
-                      <img
-                        src={editedImage}
-                        alt="Edited"
-                        className="w-full rounded-lg cursor-pointer"
-                        onClick={() => setFullscreenImage(editedImage)}
+                    <>
+                      <Card className="p-6 space-y-4">
+                        <h3 className="text-xl font-semibold">Edited Image</h3>
+                        <img
+                          src={editedImage}
+                          alt="Edited"
+                          className="w-full rounded-lg cursor-pointer"
+                          onClick={() => setFullscreenImage(editedImage)}
+                        />
+                        <Button onClick={downloadImage} className="w-full">
+                          <Download className="mr-2 h-4 w-4" />
+                          Download
+                        </Button>
+                      </Card>
+                      
+                      <BeforeAfterSlider
+                        beforeImage={imagePreview}
+                        afterImage={editedImage}
                       />
-                      <Button onClick={downloadImage} className="w-full">
-                        <Download className="mr-2 h-4 w-4" />
-                        Download
-                      </Button>
-                    </Card>
+                    </>
                   )}
                 </div>
               )}
