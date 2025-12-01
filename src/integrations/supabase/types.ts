@@ -14,6 +14,163 @@ export type Database = {
   }
   public: {
     Tables: {
+      collection_images: {
+        Row: {
+          added_at: string
+          collection_id: string
+          image_id: string
+        }
+        Insert: {
+          added_at?: string
+          collection_id: string
+          image_id: string
+        }
+        Update: {
+          added_at?: string
+          collection_id?: string
+          image_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "collection_images_collection_id_fkey"
+            columns: ["collection_id"]
+            isOneToOne: false
+            referencedRelation: "collections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "collection_images_image_id_fkey"
+            columns: ["image_id"]
+            isOneToOne: false
+            referencedRelation: "user_images"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      collections: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      edit_history: {
+        Row: {
+          created_at: string
+          id: string
+          image_id: string | null
+          prompt: string
+          success: boolean | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          image_id?: string | null
+          prompt: string
+          success?: boolean | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          image_id?: string | null
+          prompt?: string
+          success?: boolean | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "edit_history_image_id_fkey"
+            columns: ["image_id"]
+            isOneToOne: false
+            referencedRelation: "user_images"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      saved_prompts: {
+        Row: {
+          category: string | null
+          created_at: string
+          id: string
+          name: string
+          prompt: string
+          used_count: number | null
+          user_id: string
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          prompt: string
+          used_count?: number | null
+          user_id: string
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          prompt?: string
+          used_count?: number | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      share_links: {
+        Row: {
+          created_at: string
+          expires_at: string | null
+          id: string
+          image_id: string
+          token: string
+          view_count: number | null
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          image_id: string
+          token: string
+          view_count?: number | null
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          image_id?: string
+          token?: string
+          view_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "share_links_image_id_fkey"
+            columns: ["image_id"]
+            isOneToOne: false
+            referencedRelation: "user_images"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_images: {
         Row: {
           description: string | null
