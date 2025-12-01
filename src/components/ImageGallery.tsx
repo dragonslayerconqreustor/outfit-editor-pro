@@ -24,6 +24,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -383,6 +384,9 @@ export const ImageGallery = ({ onSelectImage, onViewFullscreen }: ImageGalleryPr
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Edit Image Details</DialogTitle>
+            <DialogDescription>
+              Update the description and tags for your selected image.
+            </DialogDescription>
           </DialogHeader>
           {editingImage && (
             <div className="space-y-4">

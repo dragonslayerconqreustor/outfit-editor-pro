@@ -1,4 +1,4 @@
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { X, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -13,7 +13,7 @@ export const FullscreenImageModal = ({ imageUrl, onClose }: FullscreenImageModal
 
   const downloadImage = async () => {
     if (!imageUrl) return;
-    
+
     try {
       const response = await fetch(imageUrl);
       const blob = await response.blob();
@@ -37,6 +37,10 @@ export const FullscreenImageModal = ({ imageUrl, onClose }: FullscreenImageModal
   return (
     <Dialog open={!!imageUrl} onOpenChange={onClose}>
       <DialogContent className="max-w-[95vw] max-h-[95vh] p-0 border-0 bg-black/95">
+        <DialogHeader className="sr-only">
+          <DialogTitle>Fullscreen image viewer</DialogTitle>
+          <DialogDescription>View the selected image in fullscreen and download it.</DialogDescription>
+        </DialogHeader>
         <div className="relative w-full h-full flex items-center justify-center">
           <div className="absolute top-4 right-4 z-50 flex gap-2">
             <Button
