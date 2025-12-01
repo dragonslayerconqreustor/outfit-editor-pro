@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Upload, Sparkles, Download, Loader2, LogOut, Save, Image as ImageIcon, Settings as SettingsIcon } from "lucide-react";
+import { Upload, Sparkles, Download, Loader2, LogOut, Save, Image as ImageIcon, Settings as SettingsIcon, Share2, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -12,6 +12,12 @@ import { ExamplePrompts } from "@/components/ExamplePrompts";
 import { UploadTips } from "@/components/UploadTips";
 import { BeforeAfterSlider } from "@/components/BeforeAfterSlider";
 import { KeyboardShortcuts } from "@/components/KeyboardShortcuts";
+import { SavedPrompts } from "@/components/SavedPrompts";
+import { Collections } from "@/components/Collections";
+import { UsageStatistics } from "@/components/UsageStatistics";
+import { AISuggestions } from "@/components/AISuggestions";
+import { ImageComparison } from "@/components/ImageComparison";
+import { ShareLink } from "@/components/ShareLink";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useNavigate } from "react-router-dom";
 
@@ -29,6 +35,10 @@ const Index = () => {
   const [detectedClothing, setDetectedClothing] = useState<string[]>([]);
   const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
   const [currentTab, setCurrentTab] = useState("editor");
+  const [selectedForComparison, setSelectedForComparison] = useState<Array<{ id: string; url: string; filename: string }>>([]);
+  const [isComparisonOpen, setIsComparisonOpen] = useState(false);
+  const [shareImageId, setShareImageId] = useState<string | null>(null);
+  const [savedImageId, setSavedImageId] = useState<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -110,6 +120,10 @@ const Index = () => {
       setDetectedClothing([]);
       setClothingPrompt("");
     }
+  };
+
+  const handlePromptSelect = async (prompt: string) => {
+    setClothingPrompt(prompt);
   };
 
   const analyzeClothing = async () => {
@@ -537,9 +551,48 @@ const Index = () => {
             </TabsContent>
 
             <TabsContent value="gallery" className="space-y-4">
+              <div className="flex justify-end gap-2 mb-4">
+                {selectedForComparison.length >= 2 && (
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsComparisonOpen(true)}
+                  >
+                    <Layers className="h-4 w-4 mr-2" />
+                    Compare {selectedForComparison.length} Images
+                  </Button>
+                )}
+                {savedImageId && (
+                  <Button
+                    variant="outline"
+                    onClick={() => setShareImageId(savedImageId)}
+                  >
+                    <Share2 className="h-4 w-4 mr-2" />
+                    Share
+                  </Button>
+                )}
+              </div>
               <ImageGallery
                 onSelectImage={handleSelectFromGallery}
                 onViewFullscreen={setFullscreenImage}
+              />
+            </TabsContent>
+
+            <TabsContent value="prompts" className="space-y-4">
+              <SavedPrompts onSelectPrompt={handlePromptSelect} />
+            </TabsContent>
+
+            <TabsContent value="collections" className="space-y-4">
+              <Collections selectedImages={savedImageId ? [savedImageId] : []} />
+            </TabsContent>
+
+            <TabsContent value="stats" className="space-y-4">
+              <UsageStatistics />
+            </TabsContent>
+
+            <TabsContent value="ai" className="space-y-4">
+              <AISuggestions
+                imageUrl={imagePreview}
+                onPromptSuggestion={setClothingPrompt}
               />
             </TabsContent>
           </Tabs>
@@ -550,6 +603,20 @@ const Index = () => {
         imageUrl={fullscreenImage}
         onClose={() => setFullscreenImage(null)}
       />
+
+      <ImageComparison
+        images={selectedForComparison}
+        isOpen={isComparisonOpen}
+        onClose={() => setIsComparisonOpen(false)}
+      />
+
+      {shareImageId && (
+        <ShareLink
+          imageId={shareImageId}
+          isOpen={!!shareImageId}
+          onClose={() => setShareImageId(null)}
+        />
+      )}
     </>
   );
 };
