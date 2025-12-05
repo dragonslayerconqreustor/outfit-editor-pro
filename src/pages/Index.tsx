@@ -56,38 +56,36 @@ const Index = () => {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Keyboard shortcuts
+  // Keyboard shortcut handlers
+  const handleKeyboardSave = () => {
+    if (imagePreview && user) {
+      saveImage();
+    }
+  };
+
+  const handleKeyboardUpload = () => {
+    document.getElementById("image-upload")?.click();
+  };
+
+  const handleKeyboardEdit = () => {
+    if (imagePreview && clothingPrompt.trim()) {
+      editClothing();
+    }
+  };
+
+  // Escape key for closing modals
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
-      // Save image
-      if ((e.ctrlKey || e.metaKey) && e.key === "s") {
-        e.preventDefault();
-        if (imagePreview && user) {
-          saveImage();
-        }
-      }
-      // Upload image
-      if ((e.ctrlKey || e.metaKey) && e.key === "u") {
-        e.preventDefault();
-        document.getElementById("image-upload")?.click();
-      }
-      // Tab switch
-      if (e.key === "Tab" && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
-        const activeElement = document.activeElement;
-        if (activeElement?.tagName !== "INPUT" && activeElement?.tagName !== "TEXTAREA") {
-          e.preventDefault();
-          setCurrentTab((prev) => (prev === "editor" ? "gallery" : "editor"));
-        }
-      }
-      // Close fullscreen
       if (e.key === "Escape") {
         setFullscreenImage(null);
+        setIsComparisonOpen(false);
+        setShareImageId(null);
       }
     };
 
     window.addEventListener("keydown", handleKeyPress);
     return () => window.removeEventListener("keydown", handleKeyPress);
-  }, [imagePreview, user]);
+  }, []);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -371,7 +369,12 @@ const Index = () => {
               </p>
             </div>
             <div className="flex gap-2">
-              <KeyboardShortcuts />
+              <KeyboardShortcuts
+                onNavigate={setCurrentTab}
+                onSave={handleKeyboardSave}
+                onEdit={handleKeyboardEdit}
+                onUpload={handleKeyboardUpload}
+              />
               <Button variant="outline" size="icon" onClick={() => navigate("/settings")}>
                 <SettingsIcon className="h-4 w-4" />
               </Button>
@@ -383,14 +386,30 @@ const Index = () => {
           </div>
 
           <Tabs value={currentTab} onValueChange={setCurrentTab}>
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="editor">
-                <Sparkles className="h-4 w-4 mr-2" />
-                Editor
+            <TabsList className="grid w-full grid-cols-6">
+              <TabsTrigger value="editor" className="text-xs sm:text-sm">
+                <Sparkles className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Editor</span>
               </TabsTrigger>
-              <TabsTrigger value="gallery">
-                <ImageIcon className="h-4 w-4 mr-2" />
-                Gallery
+              <TabsTrigger value="gallery" className="text-xs sm:text-sm">
+                <ImageIcon className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Gallery</span>
+              </TabsTrigger>
+              <TabsTrigger value="prompts" className="text-xs sm:text-sm">
+                <Save className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Prompts</span>
+              </TabsTrigger>
+              <TabsTrigger value="collections" className="text-xs sm:text-sm">
+                <Layers className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Collections</span>
+              </TabsTrigger>
+              <TabsTrigger value="stats" className="text-xs sm:text-sm">
+                <SettingsIcon className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Stats</span>
+              </TabsTrigger>
+              <TabsTrigger value="ai" className="text-xs sm:text-sm">
+                <Sparkles className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">AI</span>
               </TabsTrigger>
             </TabsList>
 
