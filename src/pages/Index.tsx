@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Upload, Sparkles, Download, Loader2, LogOut, Save, Image as ImageIcon, Settings as SettingsIcon, Share2, Layers } from "lucide-react";
+import { Upload, Sparkles, Download, Loader2, LogOut, Save, Image as ImageIcon, Settings as SettingsIcon, Share2, Layers, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -99,7 +99,7 @@ const Index = () => {
         return;
       }
       
-      if (file.size > 10 * 1024 * 1024) { // 10MB limit
+      if (file.size > 10 * 1024 * 1024) {
         toast({
           title: "File too large",
           description: "Please upload an image smaller than 10MB",
@@ -177,7 +177,6 @@ const Index = () => {
       }
 
       if (data?.error) {
-        // Handle explicit error responses from the edge function
         toast({
           title: "Unable to edit",
           description: data.error,
@@ -192,7 +191,6 @@ const Index = () => {
 
       setEditedImage(data.editedImage);
       
-      // Show appropriate message based on whether sanitization occurred
       if (data.sanitized) {
         toast({
           title: "Prompt adjusted",
@@ -246,13 +244,11 @@ const Index = () => {
 
     setIsSaving(true);
     try {
-      // Convert base64 or blob URL to file
       let fileToUpload: File;
       
       if (selectedImage) {
         fileToUpload = selectedImage;
       } else {
-        // If we're saving from gallery (imagePreview is a URL)
         const response = await fetch(imagePreview);
         const blob = await response.blob();
         fileToUpload = new File([blob], `image-${Date.now()}.png`, { type: 'image/png' });
@@ -271,7 +267,6 @@ const Index = () => {
         .from("fashion-images")
         .getPublicUrl(fileName);
 
-      // Save edited image if it exists
       let editedPublicUrl = null;
       if (editedImage) {
         const editedResponse = await fetch(editedImage);
@@ -291,7 +286,6 @@ const Index = () => {
         }
       }
 
-      // Save to database
       const { error: dbError } = await supabase.from("user_images").insert({
         user_id: user.id,
         original_url: publicUrl,
@@ -345,7 +339,10 @@ const Index = () => {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin" />
+        <div className="relative">
+          <div className="absolute inset-0 bg-primary/20 rounded-full blur-xl animate-pulse" />
+          <Loader2 className="h-12 w-12 animate-spin text-primary relative" />
+        </div>
       </div>
     );
   }
@@ -356,70 +353,104 @@ const Index = () => {
 
   return (
     <>
-      <div className="min-h-screen bg-gradient-to-br from-background via-secondary/20 to-background p-4 md:p-8">
+      <div className="min-h-screen p-4 md:p-8">
         <div className="max-w-7xl mx-auto space-y-8">
           {/* Header */}
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-                AI Fashion Editor
-              </h1>
-              <p className="text-muted-foreground mt-2">
-                Upload photos, edit clothing with AI
-              </p>
+          <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 animate-fade-in">
+            <div className="flex items-center gap-4">
+              <div className="icon-glow">
+                <Sparkles className="h-8 w-8 text-primary" />
+              </div>
+              <div>
+                <h1 className="text-3xl md:text-4xl font-bold gradient-text">
+                  AI Fashion Editor
+                </h1>
+                <p className="text-muted-foreground mt-1">
+                  Transform your style with AI-powered editing
+                </p>
+              </div>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               <KeyboardShortcuts
                 onNavigate={setCurrentTab}
                 onSave={handleKeyboardSave}
                 onEdit={handleKeyboardEdit}
                 onUpload={handleKeyboardUpload}
               />
-              <Button variant="outline" size="icon" onClick={() => navigate("/settings")}>
+              <Button 
+                variant="outline" 
+                size="icon" 
+                onClick={() => navigate("/settings")}
+                className="border-border/50 hover:border-primary/50 hover:bg-primary/10 transition-all"
+              >
                 <SettingsIcon className="h-4 w-4" />
               </Button>
-              <Button variant="outline" onClick={handleSignOut}>
+              <Button 
+                variant="outline" 
+                onClick={handleSignOut}
+                className="border-border/50 hover:border-destructive/50 hover:bg-destructive/10 hover:text-destructive transition-all"
+              >
                 <LogOut className="h-4 w-4 mr-2" />
                 Sign Out
               </Button>
             </div>
-          </div>
+          </header>
 
-          <Tabs value={currentTab} onValueChange={setCurrentTab}>
-            <TabsList className="grid w-full grid-cols-6">
-              <TabsTrigger value="editor" className="text-xs sm:text-sm">
-                <Sparkles className="h-4 w-4 sm:mr-2" />
+          <Tabs value={currentTab} onValueChange={setCurrentTab} className="animate-slide-up">
+            <TabsList className="glass-card border-0 p-1 h-auto flex-wrap">
+              <TabsTrigger 
+                value="editor" 
+                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary/20 data-[state=active]:to-primary/10 data-[state=active]:text-primary transition-all gap-2"
+              >
+                <Wand2 className="h-4 w-4" />
                 <span className="hidden sm:inline">Editor</span>
               </TabsTrigger>
-              <TabsTrigger value="gallery" className="text-xs sm:text-sm">
-                <ImageIcon className="h-4 w-4 sm:mr-2" />
+              <TabsTrigger 
+                value="gallery" 
+                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary/20 data-[state=active]:to-primary/10 data-[state=active]:text-primary transition-all gap-2"
+              >
+                <ImageIcon className="h-4 w-4" />
                 <span className="hidden sm:inline">Gallery</span>
               </TabsTrigger>
-              <TabsTrigger value="prompts" className="text-xs sm:text-sm">
-                <Save className="h-4 w-4 sm:mr-2" />
+              <TabsTrigger 
+                value="prompts" 
+                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary/20 data-[state=active]:to-primary/10 data-[state=active]:text-primary transition-all gap-2"
+              >
+                <Save className="h-4 w-4" />
                 <span className="hidden sm:inline">Prompts</span>
               </TabsTrigger>
-              <TabsTrigger value="collections" className="text-xs sm:text-sm">
-                <Layers className="h-4 w-4 sm:mr-2" />
+              <TabsTrigger 
+                value="collections" 
+                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary/20 data-[state=active]:to-primary/10 data-[state=active]:text-primary transition-all gap-2"
+              >
+                <Layers className="h-4 w-4" />
                 <span className="hidden sm:inline">Collections</span>
               </TabsTrigger>
-              <TabsTrigger value="stats" className="text-xs sm:text-sm">
-                <SettingsIcon className="h-4 w-4 sm:mr-2" />
+              <TabsTrigger 
+                value="stats" 
+                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary/20 data-[state=active]:to-primary/10 data-[state=active]:text-primary transition-all gap-2"
+              >
+                <SettingsIcon className="h-4 w-4" />
                 <span className="hidden sm:inline">Stats</span>
               </TabsTrigger>
-              <TabsTrigger value="ai" className="text-xs sm:text-sm">
-                <Sparkles className="h-4 w-4 sm:mr-2" />
+              <TabsTrigger 
+                value="ai" 
+                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary/20 data-[state=active]:to-primary/10 data-[state=active]:text-primary transition-all gap-2"
+              >
+                <Sparkles className="h-4 w-4" />
                 <span className="hidden sm:inline">AI</span>
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="editor" className="space-y-8">
+            <TabsContent value="editor" className="space-y-8 mt-6">
               <UploadTips />
               
               {/* Upload Section */}
-              <Card className="p-8 border-dashed">
+              <Card className="glass-card p-8 border-dashed border-2 border-border/50 hover:border-primary/30 transition-all card-hover">
                 <div className="flex flex-col items-center justify-center space-y-4">
-                  <Upload className="h-12 w-12 text-muted-foreground" />
+                  <div className="icon-glow float">
+                    <Upload className="h-8 w-8 text-primary" />
+                  </div>
                   <div className="text-center">
                     <h2 className="text-2xl font-semibold">Upload an Image</h2>
                     <p className="text-muted-foreground mt-2">
@@ -433,7 +464,7 @@ const Index = () => {
                     className="hidden"
                     id="image-upload"
                   />
-                  <Button asChild size="lg">
+                  <Button asChild size="lg" className="btn-glow bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70">
                     <label htmlFor="image-upload" className="cursor-pointer">
                       Select Image
                     </label>
@@ -444,19 +475,28 @@ const Index = () => {
               {/* Image Preview & Analysis */}
               {imagePreview && (
                 <div className="grid md:grid-cols-2 gap-8">
-                  <Card className="p-6 space-y-4">
-                    <h3 className="text-xl font-semibold">Original Image</h3>
-                    <img
-                      src={imagePreview}
-                      alt="Original"
-                      className="w-full rounded-lg cursor-pointer"
-                      onClick={() => setFullscreenImage(imagePreview)}
-                    />
+                  <Card className="glass-card p-6 space-y-4 card-hover stagger-item">
+                    <h3 className="text-xl font-semibold flex items-center gap-2">
+                      <ImageIcon className="h-5 w-5 text-primary" />
+                      Original Image
+                    </h3>
+                    <div className="relative group overflow-hidden rounded-lg">
+                      <img
+                        src={imagePreview}
+                        alt="Original"
+                        className="w-full rounded-lg cursor-pointer transition-transform duration-300 group-hover:scale-105"
+                        onClick={() => setFullscreenImage(imagePreview)}
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-background/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-center pb-4">
+                        <span className="text-sm text-foreground/80">Click to enlarge</span>
+                      </div>
+                    </div>
                     <div className="flex gap-2">
                       <Button
                         onClick={analyzeClothing}
                         disabled={isAnalyzing}
-                        className="flex-1"
+                        className="flex-1 btn-glow"
+                        variant="secondary"
                       >
                         {isAnalyzing ? (
                           <>
@@ -474,31 +514,26 @@ const Index = () => {
                         <Button
                           onClick={saveImage}
                           disabled={isSaving || !user}
-                          variant="secondary"
+                          variant="outline"
+                          className="border-primary/30 hover:bg-primary/10"
                         >
                           {isSaving ? (
-                            <>
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              Saving...
-                            </>
+                            <Loader2 className="h-4 w-4 animate-spin" />
                           ) : (
-                            <>
-                              <Save className="mr-2 h-4 w-4" />
-                              Save
-                            </>
+                            <Save className="h-4 w-4" />
                           )}
                         </Button>
                       )}
                     </div>
 
                     {detectedClothing.length > 0 && (
-                      <div className="space-y-2">
-                        <p className="text-sm font-medium">Detected Items:</p>
+                      <div className="space-y-2 p-4 bg-muted/30 rounded-lg">
+                        <p className="text-sm font-medium text-muted-foreground">Detected Items:</p>
                         <div className="flex flex-wrap gap-2">
                           {detectedClothing.map((item, index) => (
                             <span
                               key={index}
-                              className="px-3 py-1 bg-primary/10 text-primary rounded-full text-sm"
+                              className="px-3 py-1.5 bg-gradient-to-r from-primary/20 to-secondary/20 text-primary border border-primary/20 rounded-full text-sm stagger-item"
                             >
                               {item}
                             </span>
@@ -510,15 +545,26 @@ const Index = () => {
 
                   {editedImage && (
                     <>
-                      <Card className="p-6 space-y-4">
-                        <h3 className="text-xl font-semibold">Edited Image</h3>
-                        <img
-                          src={editedImage}
-                          alt="Edited"
-                          className="w-full rounded-lg cursor-pointer"
-                          onClick={() => setFullscreenImage(editedImage)}
-                        />
-                        <Button onClick={downloadImage} className="w-full">
+                      <Card className="glass-card p-6 space-y-4 card-hover stagger-item">
+                        <h3 className="text-xl font-semibold flex items-center gap-2">
+                          <Wand2 className="h-5 w-5 text-accent" />
+                          Edited Image
+                        </h3>
+                        <div className="relative group overflow-hidden rounded-lg">
+                          <img
+                            src={editedImage}
+                            alt="Edited"
+                            className="w-full rounded-lg cursor-pointer transition-transform duration-300 group-hover:scale-105"
+                            onClick={() => setFullscreenImage(editedImage)}
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-background/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-center pb-4">
+                            <span className="text-sm text-foreground/80">Click to enlarge</span>
+                          </div>
+                        </div>
+                        <Button 
+                          onClick={downloadImage} 
+                          className="w-full btn-glow bg-gradient-to-r from-accent to-secondary"
+                        >
                           <Download className="mr-2 h-4 w-4" />
                           Download
                         </Button>
@@ -536,18 +582,21 @@ const Index = () => {
               {/* Edit Section */}
               {imagePreview && (
                 <>
-                  <Card className="p-6 space-y-4">
-                    <h3 className="text-xl font-semibold">Edit Clothing</h3>
+                  <Card className="glass-card p-6 space-y-4 card-hover">
+                    <h3 className="text-xl font-semibold flex items-center gap-2">
+                      <Wand2 className="h-5 w-5 text-primary" />
+                      Edit Clothing
+                    </h3>
                     <Textarea
                       placeholder="Describe the new clothing (e.g., 'red summer dress', 'blue denim jacket')..."
                       value={clothingPrompt}
                       onChange={(e) => setClothingPrompt(e.target.value)}
-                      className="min-h-[100px]"
+                      className="min-h-[100px] bg-muted/30 border-border/50 focus:border-primary/50 resize-none"
                     />
                     <Button
                       onClick={editClothing}
                       disabled={isEditing || !clothingPrompt.trim()}
-                      className="w-full"
+                      className="w-full btn-glow bg-gradient-to-r from-primary to-secondary"
                       size="lg"
                     >
                       {isEditing ? (
@@ -569,12 +618,13 @@ const Index = () => {
               )}
             </TabsContent>
 
-            <TabsContent value="gallery" className="space-y-4">
+            <TabsContent value="gallery" className="space-y-4 mt-6">
               <div className="flex justify-end gap-2 mb-4">
                 {selectedForComparison.length >= 2 && (
                   <Button
                     variant="outline"
                     onClick={() => setIsComparisonOpen(true)}
+                    className="border-primary/30 hover:bg-primary/10"
                   >
                     <Layers className="h-4 w-4 mr-2" />
                     Compare {selectedForComparison.length} Images
@@ -584,6 +634,7 @@ const Index = () => {
                   <Button
                     variant="outline"
                     onClick={() => setShareImageId(savedImageId)}
+                    className="border-secondary/30 hover:bg-secondary/10"
                   >
                     <Share2 className="h-4 w-4 mr-2" />
                     Share
@@ -596,19 +647,19 @@ const Index = () => {
               />
             </TabsContent>
 
-            <TabsContent value="prompts" className="space-y-4">
+            <TabsContent value="prompts" className="space-y-4 mt-6">
               <SavedPrompts onSelectPrompt={handlePromptSelect} />
             </TabsContent>
 
-            <TabsContent value="collections" className="space-y-4">
+            <TabsContent value="collections" className="space-y-4 mt-6">
               <Collections selectedImages={savedImageId ? [savedImageId] : []} />
             </TabsContent>
 
-            <TabsContent value="stats" className="space-y-4">
+            <TabsContent value="stats" className="space-y-4 mt-6">
               <UsageStatistics />
             </TabsContent>
 
-            <TabsContent value="ai" className="space-y-4">
+            <TabsContent value="ai" className="space-y-4 mt-6">
               <AISuggestions
                 imageUrl={imagePreview}
                 onPromptSuggestion={setClothingPrompt}
